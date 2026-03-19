@@ -1,0 +1,27 @@
+name: Sync Endor Labs → Datadog
+
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour
+  workflow_dispatch: # allow manual runs
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - run: npx tsx src/index.ts
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_SITE: ${{ secrets.DD_SITE }}
+          ENDOR_API: ${{ secrets.ENDOR_API }}
+          ENDOR_NAMESPACE: ${{ secrets.ENDOR_NAMESPACE }}
+          ENDOR_API_KEY: ${{ secrets.ENDOR_API_KEY }}
+          ENDOR_API_SECRET: ${{ secrets.ENDOR_API_SECRET }}
