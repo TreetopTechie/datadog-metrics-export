@@ -35,7 +35,11 @@ npm ci
 
 ### Configuration
 
-Create a `.env` file in the project root (or set environment variables directly):
+Copy the example env file and fill in your values:
+
+```bash
+cp .env.example .env
+```
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -64,14 +68,13 @@ npm start
 
 A workflow is included at `.github/workflows/sync.yml` that runs the sync on an hourly schedule and supports manual dispatch.
 
-Add the following secrets to your GitHub repository:
+The workflow expects the same variables from your `.env` file to be stored as repository secrets. If you have the [GitHub CLI](https://cli.github.com/) installed, you can push them all at once:
 
-- `DD_API_KEY`
-- `DD_SITE`
-- `ENDOR_API`
-- `ENDOR_NAMESPACE`
-- `ENDOR_API_KEY`
-- `ENDOR_API_SECRET`
+```bash
+npm run setup:secrets
+```
+
+This reads every key/value pair from `.env` and calls `gh secret set` for each one.
 
 ## Example Dashboard
 

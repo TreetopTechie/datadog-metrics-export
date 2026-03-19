@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "npx tsx src/index.ts"
+    "dev": "npx tsx src/index.ts",
+    "setup:secrets": "grep -v '^#' .env | grep -v '^$' | sed 's/ *#.*//' | while IFS='=' read -r key value; do echo \"Setting $key…\"; gh secret set \"$key\" --body \"$value\"; done"
   },
   "dependencies": {
     "@datadog/datadog-api-client": "^1",
