@@ -203,58 +203,60 @@ async function main() {
 
   console.log(`  ${projectEntries.length} projects with findings`);
 
-  // Build Datadog GAUGE metric series
-  const now = Math.floor(Date.now() / 1000);
-  const series: v2.MetricSeries[] = [];
+  // Build Datadog log entries (one per project with all counts as attributes)
   const endorBaseUrl = `https://app.endorlabs.com/t/${ENDOR_NAMESPACE}`;
-  const projectTags = (e: ProjectEntry) => [
-    `project:${endorBaseUrl}/projects/${e.uuid}`,
-    `project_slug:${e.slug}`,
-  ];
+  const logs: v2.HTTPLogItem[] = [];
 
   for (const entry of projectEntries) {
+    const parts: string[] = [];
     for (const [severity, count] of Object.entries(entry.severityCounts)) {
-      series.push({
-        metric: "endorlabs.reachable_vulns.count",
-        type: 3, // GAUGE
-        points: [{ timestamp: now, value: count }],
-        tags: [`severity:${severity}`, ...projectTags(entry)],
-      });
+      parts.push(`${count} ${severity}`);
     }
     if (entry.malwareCount > 0) {
-      series.push({
-        metric: "endorlabs.malware.count",
-        type: 3, // GAUGE
-        points: [{ timestamp: now, value: entry.malwareCount }],
-        tags: projectTags(entry),
-      });
+      parts.push(`${entry.malwareCount} malware`);
     }
+
+    logs.push({
+      ddsource: "endorlabs",
+      service: "endorlabs-bridge",
+      ddtags: `project_slug:${entry.slug}`,
+      message: `${entry.slug}: ${parts.join(", ")}`,
+      additionalProperties: {
+        project_url: `${endorBaseUrl}/projects/${entry.uuid}`,
+        project_slug: entry.slug,
+        critical_count: entry.severityCounts.critical ?? 0,
+        high_count: entry.severityCounts.high ?? 0,
+        medium_count: entry.severityCounts.medium ?? 0,
+        low_count: entry.severityCounts.low ?? 0,
+        malware_count: entry.malwareCount,
+      },
+    });
   }
 
-  if (series.length === 0) {
+  if (logs.length === 0) {
     console.log("No findings — nothing to send.");
     return;
   }
 
   // Submit to Datadog
-  console.log(`Submitting ${series.length} metric series to Datadog…`);
+  console.log(`Submitting ${logs.length} log entries to Datadog…`);
 
   const ddConfig = client.createConfiguration({
     authMethods: { apiKeyAuth: DD_API_KEY },
     ...(DD_SITE && { serverVariables: { site: DD_SITE } }),
   });
-  const metricsApi = new v2.MetricsApi(ddConfig);
+  const logsApi = new v2.LogsApi(ddConfig);
 
-  const BATCH_SIZE = 500;
-  for (let i = 0; i < series.length; i += BATCH_SIZE) {
-    const batch = series.slice(i, i + BATCH_SIZE);
-    await metricsApi.submitMetrics({ body: { series: batch } });
+  const BATCH_SIZE = 1000;
+  for (let i = 0; i < logs.length; i += BATCH_SIZE) {
+    const batch = logs.slice(i, i + BATCH_SIZE);
+    await logsApi.submitLog({ body: batch });
   }
 
   console.log("Done ✓");
 
   // Summary table
-  console.log("\nReachable vuln counts submitted:");
+  console.log("\nFindings submitted:");
   console.log("-".repeat(70));
   for (const entry of projectEntries) {
     for (const [severity, count] of Object.entries(entry.severityCounts)) {

@@ -1,6 +1,6 @@
 # endorlabs-datadog-bridge
 
-Send [Endor Labs](https://www.endorlabs.com/) reachable vulnerability and malware counts to [Datadog](https://www.datadoghq.com/) as GAUGE metrics.
+Send [Endor Labs](https://www.endorlabs.com/) reachable vulnerability and malware findings to [Datadog](https://www.datadoghq.com/) as structured logs.
 
 ![Datadog Dashboard](example/dashboard.png)
 
@@ -8,17 +8,21 @@ Send [Endor Labs](https://www.endorlabs.com/) reachable vulnerability and malwar
 
 1. Authenticates with the Endor Labs API (API key/secret or bearer token).
 2. Queries all projects in the given namespace for reachable vulnerability counts (by severity) and malware findings.
-3. Converts the results into Datadog metric series.
-4. Submits the metrics to Datadog in batches.
+3. Sends one log entry per project to Datadog with all counts as structured attributes.
 
-### Metrics
+Each log entry contains the following attributes:
 
-| Metric | Type | Description | Tags |
-|--------|------|-------------|------|
-| `endorlabs.reachable_vulns.count` | Gauge | Reachable vulnerabilities per project | `severity`, `project`, `project_slug` |
-| `endorlabs.malware.count` | Gauge | Malware findings per project | `project`, `project_slug` |
+| Attribute | Description |
+|-----------|-------------|
+| `project_url` | Direct link to the project in the Endor Labs UI (clickable in Log Explorer) |
+| `project_slug` | Short repository name extracted from the project URL |
+| `critical_count` | Reachable critical vulnerabilities |
+| `high_count` | Reachable high vulnerabilities |
+| `medium_count` | Reachable medium vulnerabilities |
+| `low_count` | Reachable low vulnerabilities |
+| `malware_count` | Malware findings |
 
-The `project` tag contains a direct link to the project in the Endor Labs UI. The `project_slug` tag is the short repository name extracted from the project URL.
+Logs are tagged with `source:endorlabs` and `service:endorlabs-bridge`.
 
 ## Setup
 
@@ -80,11 +84,31 @@ This reads every key/value pair from `.env` and calls `gh secret set` for each o
 
 An importable Datadog dashboard template is provided at [`example/dashboard.json`](example/dashboard.json). It includes:
 
-- **Critical/High Reachable Vulnerabilities** — table sorted by critical and high counts, with links to Endor Labs.
+- **Critical/High Reachable Vulnerabilities** — table sorted by critical and high counts. Click a row to open the project in Endor Labs via the `project_url` attribute.
 - **Reachable Vulnerability Trend** — time series broken down by severity.
 - **Malware** — sunburst chart of malware counts by project.
 
 To import: in Datadog, go to **Dashboards > New Dashboard > Import Dashboard JSON** and paste the contents of the file.
+
+### Creating facets and measures
+
+The dashboard widgets query log attributes that must be registered as facets or measures in Datadog before they become available. After the first sync run:
+
+1. Go to **Logs > Search** and filter by `source:endorlabs`.
+2. Expand any log entry and click on each attribute listed below.
+3. Select **Create facet** and set the type as shown.
+
+| Attribute | Type |
+|-----------|------|
+| `@project_slug` | Facet (string) |
+| `@project_url` | Facet (string) |
+| `@critical_count` | Measure (integer) |
+| `@high_count` | Measure (integer) |
+| `@medium_count` | Measure (integer) |
+| `@low_count` | Measure (integer) |
+| `@malware_count` | Measure (integer) |
+
+Facets and measures only apply to logs received **after** creation. Run the sync again once all measures are in place so the dashboard has queryable data.
 
 ## License
 
